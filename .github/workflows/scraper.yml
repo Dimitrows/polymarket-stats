@@ -1,0 +1,46 @@
+name: Polymarket 5M Data Aggregator
+
+# Запуск по внешнему Webhook сигналу от cron-job.org
+on:
+  repository_dispatch:
+    types: [trigger-scraper]
+  workflow_dispatch: # Ручной запуск
+
+permissions:
+  contents: write
+
+jobs:
+  scrape-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pytz
+
+      - name: Execute Scraping Agent
+        run: python src/agent.py
+
+      - name: Commit Updated JSON Data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add public/data.json
+          git commit -m "Инкрементальное обновление базы (1 год) [skip ci]" |
+
+| exit 0
+          git push
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir:./public
