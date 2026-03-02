@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Polymarket BTC 5-Min Analytics</title>
+    <style>
+        /* CSS-переменные для глобальной цветовой схемы (Dark Mode) */
+        :root {
+            --color-background: #0f172a;
+            --color-surface: #1e293b;
+            --color-text-primary: #f8fafc;
+            --color-text-secondary: #94a3b8;
+            --color-up: #10b981;
+            --color-down: #ef4444;
+            --color-streak-border: #fbbf24;
+            --color-streak-bg: rgba(251, 191, 36, 0.08);
+            --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--color-background);
+            color: var(--color-text-primary);
+            margin: 0;
+            padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            text-align: center;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--color-surface);
+            margin-bottom: 24px;
+        }
+
+        h1 { font-size: 1.25rem; font-weight: 600; margin: 0; }
+       .day-group { margin-bottom: 32px; }
+       .day-header {
+            font-size: 1.1rem; font-weight: 500;
+            color: var(--color-text-secondary); margin-bottom: 16px;
+            display: flex; align-items: center;
+        }
+       .day-header::after {
+            content: ""; flex: 1; height: 1px;
+            background-color: var(--color-surface); margin-left: 12px;
+        }
+       .grid-container {
+            display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
+        }
+       .candle-card {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 54px; height: 64px; border-radius: 8px;
+            font-size: 0.75rem; font-weight: 700; color: #ffffff;
+        }
+       .outcome-Up { background-color: var(--color-up); }
+       .outcome-Down { background-color: var(--color-down); }
+       .time-label { opacity: 0.9; font-size: 0.7rem; margin-bottom: 4px; font-weight: 500; }
+       .streak-container {
+            display: flex; flex-wrap: wrap; gap: 8px; padding: 8px;
+            border: 2px solid var(--color-streak-border); border-radius: 12px;
+            background-color: var(--color-streak-bg); box-shadow: 0 0 16px rgba(251, 191, 36, 0.15);
+        }
+        #status-message { text-align: center; color: var(--color-text-secondary); font-size: 0.9rem; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <header><h1>Polymarket 5M Tracker</h1></header>
+    <main id="app-content"><div id="status-message">Инициализация потока данных...</div></main>
+
+    <script>
+        async function initializeDataFetch() {
+            try {
+                const response = await fetch(`data.json?v=${new Date().getTime()}`);
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                const marketData = await response.json();
+                renderMarketData(marketData);
+            } catch (error) {
+                document.getElementById('status-message').innerHTML = 'Ошибка синхронизации данных.';
+            }
+        }
+
+        function renderMarketData(data) {
+            const rootContainer = document.getElementById('app-content');
+            rootContainer.innerHTML = '';
+
+            const sortedDates = Object.keys(data).sort((a, b) => {
+                const [dayA, monthA, yearA] = a.split('-');
+                const = b.split('-');
+                return new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA);
+            });
+
+            // Для оптимизации браузера рендерим сначала только последние 7 дней (остальное можно добавить через пагинацию)
+            const datesToRender = sortedDates.slice(0, 7); 
+
+            datesToRender.forEach(dateKey => {
+                const daySection = document.createElement('section');
+                daySection.className = 'day-group';
+                daySection.innerHTML = `<div class="day-header">${dateKey}</div>`;
+                
+                const grid = document.createElement('div');
+                grid.className = 'grid-container';
+                
+                let activeStreakNode = null;
+                data[dateKey].forEach(record => {
+                    const candleHTML = `
+                        <div class="candle-card outcome-${record.outcome}">
+                            <span class="time-label">${record.time}</span>
+                            <span>${record.outcome === 'Up'? 'LONG' : 'SHORT'}</span>
+                        </div>
+                    `;
+
+                    if (record.is_streak) {
+                        if (!activeStreakNode) {
+                            activeStreakNode = document.createElement('div');
+                            activeStreakNode.className = 'streak-container';
+                            grid.appendChild(activeStreakNode);
+                        }
+                        activeStreakNode.insertAdjacentHTML('beforeend', candleHTML);
+                    } else {
+                        activeStreakNode = null;
+                        grid.insertAdjacentHTML('beforeend', candleHTML);
+                    }
+                });
+                daySection.appendChild(grid);
+                rootContainer.appendChild(daySection);
+            });
+            
+            if(sortedDates.length > 7) {
+                rootContainer.insertAdjacentHTML('beforeend', `<div id="status-message">Отображены последние 7 дней из истории за год.</div>`);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', initializeDataFetch);
+    </script>
+</body>
+</html>
